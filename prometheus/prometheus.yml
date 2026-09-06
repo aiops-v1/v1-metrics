@@ -1,0 +1,43 @@
+global:
+  scrape_interval: 15s
+
+# No rule_files in this stage — alerting arrives together with SLOs and the
+# RCA agent in v4-rca. This stage is pure "what is a metric, where does it
+# come from, how do I query and graph it."
+
+scrape_configs:
+  - job_name: 'expense-backend'
+    static_configs:
+      - targets: ['backend:4000']
+        labels:
+          tier: backend
+
+  - job_name: 'mysql'
+    static_configs:
+      - targets: ['mysqld-exporter:9104']
+        labels:
+          tier: mysql
+
+  - job_name: 'nginx-frontend'
+    static_configs:
+      - targets: ['nginx-exporter:9113']
+        labels:
+          tier: frontend
+
+  - job_name: 'node'
+    static_configs:
+      - targets: ['node-exporter:9100']
+        labels:
+          tier: host
+
+  - job_name: 'cadvisor'
+    static_configs:
+      - targets: ['cadvisor:8080']
+        labels:
+          tier: infra
+
+  - job_name: 'prometheus'
+    static_configs:
+      - targets: ['localhost:9090']
+        labels:
+          tier: infra
