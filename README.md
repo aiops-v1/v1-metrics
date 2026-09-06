@@ -10,15 +10,18 @@ Alertmanager, Grafana), just different questions asked of the same data.
 
 ## What's running
 
-The app repos (`../expense-backend-v1`, `../expense-frontend-v1`,
-`../expense-mysql-v1` — siblings of this folder) are otherwise unmodified;
-this folder mostly adds the observability layer around them. One exception:
-`../expense-frontend-v1`'s `nginx.conf`/`Dockerfile` have their otel/tracing
-config removed (and `src/main.jsx` no longer imports the browser-side
-tracer) — this stage is metrics-only, with no otel-collector on the
-network for any of that to talk to, and nginx refuses to start outright
-when a static upstream hostname it references can't resolve at all. Ready
-to be re-added whenever a traces stage gets built.
+The app repos (`../expense-backend-v1.1`, `../expense-frontend-v1.1`,
+`../expense-mysql-v1.1` — siblings of this folder) are otherwise
+unmodified; this folder mostly adds the observability layer around them.
+One exception: `../expense-backend-v1.1`'s `src/app.js` has its middleware
+order fixed — `httpLogger`/`baseLogContext`/`httpMetricsMiddleware` now run
+*before* `express.json()`, not after. Before that fix, a malformed request
+body (`express.json()` throwing) skipped every middleware registered after
+it, including the metrics middleware (so that 500 was invisible to
+`http_requests_total`) and the logging middleware (so `req.log` was
+undefined when the error handler tried to use it — a second crash on top
+of the first). Confirmed live with `fault-load.sh`'s malformed-JSON case
+before this fix existed.
 
 - **Prometheus** — scrapes the backend's own `/metrics`, `mysqld-exporter`
   (a sidecar process reading MySQL's internals), `nginx-exporter` (reading
@@ -142,7 +145,7 @@ keep each one legible on its own.
 
 ### Row: Business metrics
 Four counters the backend increments explicitly at points that matter to
-the business, not the framework (`src/metrics.js` in `expense-backend-v1`):
+the business, not the framework (`src/metrics.js` in `expense-backend-v1.1`):
 `users_registered_total`, `user_logins_total`, `expenses_created_total`,
 `expense_amount_rupees_total`. The dashboard reads these two ways —
 ```promql
@@ -373,7 +376,7 @@ Prometheus's `query` template function, not a recording rule — that finds
 the single worst route+method via `topk(1, ...)` and names it directly in
 the Slack/email text: `Slowest endpoint right now: POST /auth/signup (p99
 497ms)`. Confirmed live: bcrypt's cost factor (`BCRYPT_ROUNDS = 12` in
-`expense-backend-v1/src/routes/auth.js`) makes `/auth/signup` and
+`expense-backend-v1.1/src/routes/auth.js`) makes `/auth/signup` and
 `/auth/signin` reliably the slowest routes in this app, by a wide margin
 over anything DB-bound — worth pointing out as the real, first thing this
 alert is likely to ever name, not a hypothetical.

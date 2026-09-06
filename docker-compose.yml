@@ -1,6 +1,6 @@
 services:
   mysql:
-    build: ../expense-mysql-v1
+    build: ../expense-mysql-v1.1
     container_name: expense-mysql
     environment:
       MYSQL_ROOT_PASSWORD: rootpass
@@ -16,7 +16,7 @@ services:
       retries: 10
 
   backend:
-    build: ../expense-backend-v1
+    build: ../expense-backend-v1.1
     container_name: backend
     environment:
       PORT: 4000
@@ -53,7 +53,7 @@ services:
     container_name: mysqld-exporter
     # v0.15.x dropped DATA_SOURCE_NAME support — credentials come from a
     # mounted my.cnf file instead (see ./mysqld-exporter/.my.cnf). The
-    # metrics_exporter DB user itself is provisioned by expense-mysql-v1's
+    # metrics_exporter DB user itself is provisioned by expense-mysql-v1.1's
     # own migrations, not anything in this compose file.
     command:
       - --config.my-cnf=/etc/mysqld-exporter/.my.cnf
