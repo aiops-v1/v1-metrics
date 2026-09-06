@@ -1,6 +1,6 @@
 services:
   mysql:
-    build: ../../expense-app/expense-mysql-v1
+    build: ../expense-mysql-v1
     container_name: expense-mysql
     environment:
       MYSQL_ROOT_PASSWORD: rootpass
@@ -16,7 +16,7 @@ services:
       retries: 10
 
   backend:
-    build: ../../expense-app/expense-backend-v1
+    build: ../expense-backend-v1
     container_name: backend
     environment:
       PORT: 4000
@@ -39,7 +39,7 @@ services:
         condition: service_healthy
 
   frontend:
-    build: ../../expense-app/expense-frontend-v1
+    build: ../expense-frontend-v1
     container_name: frontend
     ports:
       - "80:80"

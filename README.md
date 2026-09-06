@@ -13,11 +13,12 @@ so the story stays "here's what we just added," not "here's a flag."
 
 ## What's here, and why only this
 
-The app itself (`../../expense-app/expense-backend-v1`,
-`expense-frontend-v1`, `expense-mysql-v1`) is the **same source** the full
-reference build in `../../expense-app/observability` uses — this stage
-doesn't fork the app, it just stands up a smaller slice of the observability
-stack around it:
+The app repos (`../expense-backend-v1`, `../expense-frontend-v1`,
+`../expense-mysql-v1` — siblings of this folder inside
+`expense-app-stages/`, same content as `../../expense-app/expense-*-v1`)
+are shared across every stage in this folder, unmodified per stage — this
+stage doesn't fork the app, it just stands up a smaller slice of the
+observability stack around it:
 
 - **Prometheus** — scrapes the backend's own `/metrics`, `mysqld-exporter`
   (a sidecar process reading MySQL's internals), `nginx-exporter` (reading
