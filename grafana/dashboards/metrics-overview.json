@@ -137,7 +137,7 @@
           "refId": "A"
         }
       ],
-      "description": "Grouped by (method, route) together, not route alone — POST /expenses/ and GET /expenses/ can have very different latency profiles (a write that hits the DB vs a cached-ish read), and collapsing them into one /expenses/ line would hide that. Three separate panels, one per percentile, rather than three lines on one panel — easier to read when method+route pushes the legend past a handful of entries."
+      "description": "Grouped by (method, route) together, not route alone ï¿½ POST /expenses/ and GET /expenses/ can have very different latency profiles (a write that hits the DB vs a cached-ish read), and collapsing them into one /expenses/ line would hide that. Three separate panels, one per percentile, rather than three lines on one panel ï¿½ easier to read when method+route pushes the legend past a handful of entries."
     },
     {
       "id": 21,
@@ -170,7 +170,7 @@
           "refId": "A"
         }
       ],
-      "description": "Grouped by (method, route) together, not route alone — POST /expenses/ and GET /expenses/ can have very different latency profiles (a write that hits the DB vs a cached-ish read), and collapsing them into one /expenses/ line would hide that. Three separate panels, one per percentile, rather than three lines on one panel — easier to read when method+route pushes the legend past a handful of entries."
+      "description": "Grouped by (method, route) together, not route alone ï¿½ POST /expenses/ and GET /expenses/ can have very different latency profiles (a write that hits the DB vs a cached-ish read), and collapsing them into one /expenses/ line would hide that. Three separate panels, one per percentile, rather than three lines on one panel ï¿½ easier to read when method+route pushes the legend past a handful of entries."
     },
     {
       "id": 22,
@@ -203,7 +203,7 @@
           "refId": "A"
         }
       ],
-      "description": "Grouped by (method, route) together, not route alone — POST /expenses/ and GET /expenses/ can have very different latency profiles (a write that hits the DB vs a cached-ish read), and collapsing them into one /expenses/ line would hide that. Three separate panels, one per percentile, rather than three lines on one panel — easier to read when method+route pushes the legend past a handful of entries."
+      "description": "Grouped by (method, route) together, not route alone ï¿½ POST /expenses/ and GET /expenses/ can have very different latency profiles (a write that hits the DB vs a cached-ish read), and collapsing them into one /expenses/ line would hide that. Three separate panels, one per percentile, rather than three lines on one panel ï¿½ easier to read when method+route pushes the legend past a handful of entries."
     },
     {
       "id": 101,
@@ -675,8 +675,8 @@
             "type": "prometheus",
             "uid": "prometheus"
           },
-          "expr": "sum(rate(container_cpu_usage_seconds_total{name=~\"backend|frontend|expense-mysql\"}[5m])) by (name)",
-          "legendFormat": "{{name}}",
+          "expr": "label_replace(sum(rate(container_cpu_usage_seconds_total{image=~\".*v1-metrics-(backend|frontend|mysql).*\"}[5m])) by (image), \"service\", \"$1\", \"image\", \".*v1-metrics-(backend|frontend|mysql).*\")",
+          "legendFormat": "{{service}}",
           "refId": "A"
         }
       ]
@@ -707,8 +707,8 @@
             "type": "prometheus",
             "uid": "prometheus"
           },
-          "expr": "container_memory_usage_bytes{name=~\"backend|frontend|expense-mysql\"}",
-          "legendFormat": "{{name}}",
+          "expr": "label_replace(container_memory_usage_bytes{image=~\".*v1-metrics-(backend|frontend|mysql).*\"}, \"service\", \"$1\", \"image\", \".*v1-metrics-(backend|frontend|mysql).*\")",
+          "legendFormat": "{{service}}",
           "refId": "A"
         }
       ]

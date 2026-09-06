@@ -194,8 +194,7 @@ vantage points on the same physical machine:
 ```promql
 100 * (1 - avg(rate(node_cpu_seconds_total{mode="idle"}[5m])))   # host CPU, from node-exporter
 node_memory_MemAvailable_bytes / node_memory_MemTotal_bytes * 100   # host memory, from node-exporter
-sum(rate(container_cpu_usage_seconds_total{name=~"backend|frontend|expense-mysql"}[5m])) by (name)   # per-container CPU, from cadvisor
-container_memory_usage_bytes{name=~"backend|frontend|expense-mysql"}   # per-container memory, from cadvisor
+label_replace(sum(rate(container_cpu_usage_seconds_total{image=~".*v1-metrics-(backend|frontend|mysql).*"}[5m])) by (image), "service", "$1", "image", ".*v1-metrics-(backend|frontend|mysql).*")   # per-container CPU, from cadvisor
 ```
 `node_cpu_seconds_total` is, like `http_requests_total`, a counter — CPU
 time is measured in *seconds accumulated in each mode* (idle, user, system,
@@ -204,6 +203,22 @@ idle mode's rate (fraction of each second spent idle), subtract from 1,
 multiply by 100. node-exporter answers "how busy is the whole host";
 cadvisor answers "how much of that is this one container" — same
 underlying kernel accounting, two different aggregation levels.
+
+**Why `image`, not `name`, and why `label_replace()`**: this host's Docker
+runs with the containerd-snapshotter storage backend (see
+`docker-compose.yml`'s `cadvisor` service comments for the full story of
+what that broke and how it's wired around). cAdvisor reads container state
+through containerd's own API here instead of Docker's, and containerd
+identifies containers by their raw ID, not Docker's human-readable
+`--name` — so `container_cpu_usage_seconds_total{name="backend"}` matches
+nothing on this stack, even though `name` exists as a label on other
+containers. `image` is still legible (`docker.io/library/v1-metrics-backend:latest`
+— `v1-metrics` is this project's Compose directory name, prepended
+automatically), so the query filters on that instead, then `label_replace()`
+extracts just the service name into a new `service` label purely so the
+legend reads "backend" instead of the full image string. This is
+specifically brittle if this folder is ever renamed away from
+`v1-metrics` — the regex would need to change with it.
 
 ### Row: Scrape target health
 ```promql

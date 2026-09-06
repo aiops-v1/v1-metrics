@@ -125,6 +125,13 @@ services:
       # host, that default would connect successfully and still see zero
       # containers, a quieter failure mode than the one this replaces.
       - --containerd-namespace=moby
+      # Confirmed live, worth knowing before reading the metrics dashboard's
+      # container CPU/memory panels: containerd identifies containers by
+      # their raw ID, not Docker's human-readable --name — the "name" label
+      # cadvisor now emits for these containers is that raw ID, not
+      # "backend"/"frontend"/"mysql". Those panels filter on the "image"
+      # label instead (still legible), see the v1-metrics README's own note
+      # on this for the full explanation.
     depends_on:
       - backend
       - frontend
