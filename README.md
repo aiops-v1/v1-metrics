@@ -111,20 +111,34 @@ the one above — worth pointing out explicitly, since it reinforces that
 PromQL's power is mostly "filter by labels, then apply the same handful of
 functions," not a large vocabulary to memorize.
 
-**p95 request duration by route**
+**p50 / p95 / p99 request duration by method & route — three separate panels**
 ```promql
-histogram_quantile(0.95, sum(rate(http_request_duration_seconds_bucket[5m])) by (le, route))
+histogram_quantile(0.50, sum(rate(http_request_duration_seconds_bucket[5m])) by (le, method, route))
+histogram_quantile(0.95, sum(rate(http_request_duration_seconds_bucket[5m])) by (le, method, route))
+histogram_quantile(0.99, sum(rate(http_request_duration_seconds_bucket[5m])) by (le, method, route))
 ```
 `http_request_duration_seconds` is a **histogram**, not a counter or gauge
 — under the hood it's actually several counters, one per bucket boundary
 (`le="0.1"`, `le="0.5"`, `le="1"`, ...), each counting "how many requests
 took ≤ this long." `histogram_quantile()` is the one function that knows
 how to turn a set of cumulative bucket counters into an estimated
-percentile. The `by (le, route)` is easy to get backwards: `le` **must** be
-kept (it's the input `histogram_quantile()` needs), `route` is kept because
-that's what we want a separate line per. Drop `le` from the `by (...)` and
-the query silently returns nothing useful, not an error — worth
-demonstrating that failure mode once, live.
+percentile — and it only ever answers for *one* quantile per call, which
+is why this is three queries (and three panels), not one query with three
+numbers in it. The `by (le, method, route)` is easy to get backwards: `le`
+**must** be kept (it's the input `histogram_quantile()` needs); `method`
+and `route` are kept together because that's the actual dimension worth a
+separate line per — `POST /expenses/` (a write, touches the DB) and
+`GET /expenses/` (a read) can have very different latency profiles, and
+grouping by `route` alone would blend them into one misleading line. Drop
+`le` from the `by (...)` and the query silently returns nothing useful, not
+an error — worth demonstrating that failure mode once, live.
+
+**Why three panels instead of three lines on one**: p50, p95, and p99 tell
+different stories — p50 is the typical request, p99 is the tail, the one
+slow outlier in a hundred that a p50-only view hides completely — and once
+each line is *also* split by method+route, three quantiles times several
+routes on one panel gets unreadable fast. Separate panels per quantile
+keep each one legible on its own.
 
 ### Row: Business metrics
 Four counters the backend increments explicitly at points that matter to
