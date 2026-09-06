@@ -1,0 +1,88 @@
+# SLIs (Service Level Indicators) as recording rules — pre-computed ratios,
+# cheap to query repeatedly from Grafana/alerting rules instead of
+# recomputing the same rate()/histogram_quantile() math on every read.
+#
+# Two layers, deliberately: `sli:*` (no second segment) is the "official"
+# SLI, measured at nginx — the boundary closest to the actual client, via
+# nginx-module-vts (job "nginx-vts" in prometheus.yml). `sli:backend:*` is
+# the same question asked one layer downstream, straight from the
+# backend's own metrics. Alerting (slo-burn-rate-alerts.yml) fires on the
+# official one; the dashboard plots both side by side, because the *gap*
+# between them is diagnostic on its own: if only the official (nginx) line
+# dips, the problem is nginx itself (or the network between nginx and the
+# backend) — if both dip together, it's downstream, in the backend or MySQL.
+# Every nginx_vts_* selector below filters host!="*" — nginx-module-vts
+# emits a "*"-hosted all-vhosts-combined pseudo-series alongside the real
+# per-vhost one, which silently doubles any unfiltered count (confirmed
+# live in this project before; not a hypothetical).
+#
+# SLA vs SLO: the SLA (99%, the external/contractual promise) is
+# deliberately looser than the SLO (99.5%, the internal target this stack
+# actually alerts on). The gap between them (0.5 percentage points) is the
+# safety margin — breaching the SLO is the early warning that gives you
+# room to fix things *before* the SLA itself (the number you'd owe a
+# customer credit over) is at risk. Nothing in this file references 99%
+# directly for that reason: every alert and every error-budget calculation
+# below is against the SLO (0.995), not the SLA.
+#
+# 30-day period, split into two windows: sli:*_rate1h (short, reactive) and
+# sli:*_rate30d (long, matches the SLO's own accounting period — also what
+# the error-budget-remaining panel reads). See slo-burn-rate-alerts.yml's
+# own comments for the real caveat on pairing a short window with the full
+# period instead of a shorter "confirmation" window.
+#
+# Split into two rule groups, not one, so the expensive part isn't paying
+# for a freshness it doesn't need: a 30-day ratio genuinely doesn't change
+# meaningfully between one 15s tick and the next, so it's evaluated every
+# 5m instead — the 1h ratio still gets a much shorter interval since that's
+# the one actually meant to react quickly.
+groups:
+  - name: expense-tracker-slis-fast
+    interval: 30s
+    rules:
+      # Availability SLI (official, nginx) — fraction of requests nginx
+      # itself didn't record as a 5xx. code is a status *class* label
+      # ("1xx".."5xx"), plus that host="*" rollup — the code=~ regex here
+      # matches only the five real classes, same pattern already used on
+      # the metrics dashboard's "Request rate by status class" panel.
+      - record: sli:availability:ratio_rate1h
+        expr: >-
+          sum(rate(nginx_vts_server_requests_total{code=~"1xx|2xx|3xx|4xx|5xx", code!="5xx", host!="*"}[1h]))
+            / sum(rate(nginx_vts_server_requests_total{code=~"1xx|2xx|3xx|4xx|5xx", host!="*"}[1h]))
+
+      # Availability SLI (diagnostic, backend) — same question, one layer
+      # downstream. Fraction of requests that were NOT a 5xx.
+      - record: sli:backend:availability:ratio_rate1h
+        expr: >-
+          sum(rate(http_requests_total{status_code!~"5.."}[1h]))
+            / sum(rate(http_requests_total[1h]))
+
+      # Latency SLI (official, nginx) — estimated p99 request duration as
+      # nginx itself sees it (full nginx-side time, including whatever
+      # nginx spent waiting on the backend). Session-only targets (see
+      # README): client-facing commitment is 500ms p99, internal target is
+      # a stricter 400ms p99.
+      - record: sli:latency:p99_seconds_rate1h
+        expr: histogram_quantile(0.99, sum(rate(nginx_vts_server_request_duration_seconds_bucket{host!="*"}[1h])) by (le))
+
+      # Latency SLI (diagnostic, backend) — same estimate, one layer
+      # downstream. The gap between this and the official line above is
+      # nginx's own overhead (proxying, TLS, queueing) made visible as data.
+      - record: sli:backend:latency:p99_seconds_rate1h
+        expr: histogram_quantile(0.99, sum(rate(http_request_duration_seconds_bucket[1h])) by (le))
+
+  - name: expense-tracker-slis-slow
+    interval: 5m
+    rules:
+      - record: sli:availability:ratio_rate30d
+        expr: >-
+          sum(rate(nginx_vts_server_requests_total{code=~"1xx|2xx|3xx|4xx|5xx", code!="5xx", host!="*"}[30d]))
+            / sum(rate(nginx_vts_server_requests_total{code=~"1xx|2xx|3xx|4xx|5xx", host!="*"}[30d]))
+      - record: sli:backend:availability:ratio_rate30d
+        expr: >-
+          sum(rate(http_requests_total{status_code!~"5.."}[30d]))
+            / sum(rate(http_requests_total[30d]))
+      - record: sli:latency:p99_seconds_rate30d
+        expr: histogram_quantile(0.99, sum(rate(nginx_vts_server_request_duration_seconds_bucket{host!="*"}[30d])) by (le))
+      - record: sli:backend:latency:p99_seconds_rate30d
+        expr: histogram_quantile(0.99, sum(rate(http_request_duration_seconds_bucket[30d])) by (le))

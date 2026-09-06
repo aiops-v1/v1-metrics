@@ -1,9 +1,23 @@
 global:
   scrape_interval: 15s
 
-# No rule_files in this stage — alerting arrives together with SLOs and the
-# RCA agent in v4-rca. This stage is pure "what is a metric, where does it
-# come from, how do I query and graph it."
+# alert-rules.yml: introductory, single-condition threshold alerts
+# (up==0, error-rate %, p95 latency, host CPU/memory). slo-rules.yml: SLI
+# recording rules (availability + latency ratios). slo-burn-rate-alerts.yml:
+# multi-window burn-rate alerts built on those SLIs — a bigger conceptual
+# jump than a plain threshold, but the same three tools (Prometheus,
+# Alertmanager, Grafana) doing it, so it lives here too rather than in a
+# separate stage. See ../alertmanager/ for where a Firing alert actually
+# goes (email + Slack).
+rule_files:
+  - /etc/prometheus/alert-rules.yml
+  - /etc/prometheus/slo-rules.yml
+  - /etc/prometheus/slo-burn-rate-alerts.yml
+
+alerting:
+  alertmanagers:
+    - static_configs:
+        - targets: ['alertmanager:9093']
 
 scrape_configs:
   - job_name: 'expense-backend'
@@ -23,6 +37,22 @@ scrape_configs:
       - targets: ['nginx-exporter:9113']
         labels:
           tier: frontend
+
+  # nginx-module-vts, scraped straight from nginx itself — adds
+  # request-duration histograms and per-status-code counts, which
+  # stub_status (the job above) has no concept of at all. This is what
+  # makes an nginx-level ("official") SLI possible in slo-rules.yml,
+  # compared there against the backend-level ("diagnostic") one. Confirmed
+  # against the module's own source, not guessed: the path is
+  # /status/format/prometheus, and it emits a host="*" all-vhosts-combined
+  # pseudo-series alongside the real per-vhost one — every query against
+  # this job in slo-rules.yml filters host!="*" for exactly that reason.
+  - job_name: 'nginx-vts'
+    static_configs:
+      - targets: ['frontend:8080']
+        labels:
+          tier: frontend
+    metrics_path: /status/format/prometheus
 
   - job_name: 'node'
     static_configs:

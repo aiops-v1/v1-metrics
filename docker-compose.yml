@@ -39,6 +39,18 @@ services:
         condition: service_healthy
 
   frontend:
+    # ../expense-frontend-v1 is an exact, unmodified copy of
+    # ../../expense-app/expense-frontend-v1 — otel/tracing config included,
+    # kept intentionally intact for whenever a traces stage gets built here
+    # rather than forked/stripped down. Known consequence right now: its
+    # nginx.conf points at "otel-collector" (a static hostname, resolved at
+    # nginx startup, not per-request), which doesn't exist as a service in
+    # this stage — nginx typically refuses to start at all when a static
+    # upstream hostname can't resolve ("host not found in upstream"), so
+    # this container (and the nginx-vts scrape job below, and the
+    # sli:availability:*/sli:latency:* "official" SLIs that depend on it)
+    # won't come up until that's addressed — see the v1-metrics README's
+    # "Known gap" section. Deferred deliberately, not an oversight.
     build: ../expense-frontend-v1
     container_name: frontend
     ports:
@@ -114,16 +126,42 @@ services:
       - --storage.tsdb.path=/prometheus
       - --web.console.libraries=/etc/prometheus/console_libraries
       - --web.console.templates=/etc/prometheus/consoles
+      # Default retention is 15d — too short for slo-rules.yml's 30-day
+      # window (rate([30d]) would silently lose its oldest data mid-window
+      # otherwise). No named volume backs /prometheus (see the volumes:
+      # section below), so this data doesn't survive a container recreation
+      # anyway — 35d costs nothing extra in practice, just headroom over 30d.
+      - --storage.tsdb.retention.time=35d
     volumes:
       - ./prometheus/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - ./prometheus/alert-rules.yml:/etc/prometheus/alert-rules.yml:ro
+      - ./prometheus/slo-rules.yml:/etc/prometheus/slo-rules.yml:ro
+      - ./prometheus/slo-burn-rate-alerts.yml:/etc/prometheus/slo-burn-rate-alerts.yml:ro
     ports:
       - "9090:9090"
     depends_on:
       - backend
+      - frontend
       - mysqld-exporter
       - nginx-exporter
       - node-exporter
       - cadvisor
+      - alertmanager
+
+  # --- Alerting: Prometheus evaluates alert-rules.yml, Alertmanager routes
+  # firing alerts to email + Slack. See ./alertmanager/secrets/README.md
+  # for the one-time setup (Gmail app password, Slack incoming webhook) —
+  # neither secret lives in this file or in alertmanager.yml itself.
+  alertmanager:
+    image: prom/alertmanager:v0.27.0
+    container_name: alertmanager
+    command:
+      - --config.file=/etc/alertmanager/alertmanager.yml
+    volumes:
+      - ./alertmanager/alertmanager.yml:/etc/alertmanager/alertmanager.yml:ro
+      - ./alertmanager/secrets:/etc/alertmanager/secrets:ro
+    ports:
+      - "9093:9093"
 
   grafana:
     image: grafana/grafana:11.3.0

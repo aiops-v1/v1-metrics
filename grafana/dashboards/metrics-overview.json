@@ -367,6 +367,53 @@
           "refId": "A"
         }
       ]
+    },
+
+    { "id": 106, "type": "row", "title": "Alerting — Inactive / Pending / Firing", "gridPos": { "h": 1, "w": 24, "x": 0, "y": 57 } },
+    {
+      "id": 19,
+      "type": "table",
+      "title": "Current alert states (../prometheus/alert-rules.yml, routed to email + Slack by ../alertmanager/)",
+      "gridPos": { "h": 8, "w": 24, "x": 0, "y": 58 },
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "fieldConfig": {
+        "defaults": { "custom": { "cellOptions": { "type": "auto" } } },
+        "overrides": [
+          {
+            "matcher": { "id": "byName", "options": "alertstate" },
+            "properties": [
+              {
+                "id": "custom.cellOptions",
+                "value": { "type": "color-background" }
+              },
+              {
+                "id": "mappings",
+                "value": [
+                  { "type": "value", "options": { "pending": { "color": "yellow" }, "firing": { "color": "red" } } }
+                ]
+              }
+            ]
+          }
+        ]
+      },
+      "transformations": [
+        {
+          "id": "organize",
+          "options": {
+            "excludeByName": { "Time": true, "Value": true, "__name__": true },
+            "indexByName": { "alertname": 0, "alertstate": 1, "severity": 2, "instance": 3, "job": 4 }
+          }
+        }
+      ],
+      "targets": [
+        {
+          "datasource": { "type": "prometheus", "uid": "prometheus" },
+          "expr": "ALERTS",
+          "format": "table",
+          "instant": true,
+          "refId": "A"
+        }
+      ]
     }
   ]
 }
