@@ -101,6 +101,30 @@ services:
       - /sys:/sys:ro
       - /var/lib/docker/:/var/lib/docker:ro
       - /dev/disk/:/dev/disk:ro
+      # This host's Docker runs with the containerd-snapshotter storage
+      # backend (confirmed live: `docker info --format '{{.Driver}}'`
+      # reports "overlayfs", not the classic "overlay2" — the tell that
+      # containerd, not Docker's own graphdriver, owns image/container
+      # storage). Under that backend, /var/lib/docker/image/ never gets the
+      # image/overlay2/layerdb/mounts/<id>/mount-id files cAdvisor's Docker
+      # container handler reads directly off disk — so every real container
+      # cAdvisor finds fails with "failed to identify the read-write layer
+      # ID," no matter the cAdvisor version, since that metadata format
+      # simply doesn't exist under this backend. Pointing cAdvisor at
+      # containerd's own socket instead (below) reads container state via
+      # containerd's API rather than parsing Docker's internal files, which
+      # sidesteps the broken path entirely.
+      - /run/containerd/containerd.sock:/run/containerd/containerd.sock:ro
+    command:
+      - --containerd=/run/containerd/containerd.sock
+      # Docker's own embedded containerd instance namespaces everything it
+      # manages under "moby" — confirmed against containerd's own
+      # documentation, not guessed. cAdvisor's default ("k8s.io") is aimed
+      # at Kubernetes nodes, where the container runtime's containerd
+      # instance is namespaced for CRI instead; pointed at a plain Docker
+      # host, that default would connect successfully and still see zero
+      # containers, a quieter failure mode than the one this replaces.
+      - --containerd-namespace=moby
     depends_on:
       - backend
       - frontend
