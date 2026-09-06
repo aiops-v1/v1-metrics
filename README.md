@@ -38,13 +38,6 @@ Two layers of alerting, both live here:
   threshold, covered in its own section below rather than folded into the
   panel-by-panel walkthrough.
 
-## Before you start
-
-This stack uses the same container names and host ports (80, 3000, 9090)
-as `../../expense-app/observability` — fine as long as that stack isn't
-also running on this host. If you ever do bring both up side by side,
-either stack's containers/ports will collide with the other's.
-
 ## Quick start
 
 ```bash
@@ -417,32 +410,24 @@ show up on the *other* table, also automatically.
   table is the equivalent "how it connects" moment for latency.
 
 ### Known gap: the frontend currently won't start in this stage
-The config above (`sli:availability:*`/`sli:latency:*`, the "official"
-layer) is written against `nginx_vts_*` metrics and is correct — but
-`../expense-frontend-v1`'s `nginx.conf` also still has its otel/tracing
-config fully intact (`otel_exporter`, the `/otel/` location proxying to
-`otel-collector:4318`), matching the full reference build
-(`../../expense-app/expense-frontend-v1`) exactly, kept that way on purpose
-rather than forked/stripped down, so it's ready as-is whenever a
-traces/otel stage gets built here. This stage's `docker-compose.yml` has no
-`otel-collector` service, though — and unlike the backend's
-`ENABLE_TRACING` flag (which degrades gracefully, just retrying quietly in
-the background), nginx resolves a static hostname like `otel-collector` at
-startup, not per-request. If that resolution fails outright (no such
-service on the network at all, not just temporarily unreachable), nginx
-typically refuses to start — `host not found in upstream` — taking the
-whole frontend container down with it, not just tracing.
+`../expense-frontend-v1`'s `nginx.conf` references another service by
+hostname that isn't part of this stage's `docker-compose.yml` — reserved
+for a later stage this curriculum hasn't reached yet. nginx resolves a
+static hostname reference like that once, at startup, not per-request; when
+it can't resolve at all (no service by that name exists on this network,
+not just temporarily unreachable), nginx typically refuses to start rather
+than degrading gracefully — so the whole frontend container fails to come
+up, not just the one feature that reference was for.
 
 Practical effect right now: `mysql`, `backend`, and every exporter that
 doesn't depend on the frontend still work fine, including the
 `sli:backend:*` (diagnostic) SLIs and their panels. The `nginx-vts` scrape
 job, the `sli:availability:*`/`sli:latency:*` (official) SLIs, and the two
-SLO burn-rate alerts (which read those official SLIs) will show "no data"
-and never fire until the frontend can actually start — deferred
-deliberately rather than fixed now, either by adding a real
-`otel-collector` (+ Tempo) to this stage ahead of schedule, or by forking
-this copy of the frontend to drop its otel config the way the backend's
-tracing is already toggled off. Neither has been done yet.
+SLO burn-rate alerts that read them will show "no data" and never fire
+until the frontend can actually start. Deferred deliberately for now, not
+an oversight — fixing it means either bringing that missing service into
+this stage ahead of schedule, or editing this copy of the frontend's config
+to drop the reference to it. Neither has been done yet.
 
 ### What else is still deliberately missing
 No automated response to a firing SLO alert — that's a distinct piece of

@@ -39,18 +39,15 @@ services:
         condition: service_healthy
 
   frontend:
-    # ../expense-frontend-v1 is an exact, unmodified copy of
-    # ../../expense-app/expense-frontend-v1 — otel/tracing config included,
-    # kept intentionally intact for whenever a traces stage gets built here
-    # rather than forked/stripped down. Known consequence right now: its
-    # nginx.conf points at "otel-collector" (a static hostname, resolved at
-    # nginx startup, not per-request), which doesn't exist as a service in
-    # this stage — nginx typically refuses to start at all when a static
-    # upstream hostname can't resolve ("host not found in upstream"), so
-    # this container (and the nginx-vts scrape job below, and the
-    # sli:availability:*/sli:latency:* "official" SLIs that depend on it)
-    # won't come up until that's addressed — see the v1-metrics README's
-    # "Known gap" section. Deferred deliberately, not an oversight.
+    # ../expense-frontend-v1's nginx.conf references another service by
+    # hostname (resolved at nginx startup, not per-request) that isn't part
+    # of this stage — reserved for a later stage this curriculum hasn't
+    # reached yet. nginx typically refuses to start at all when a static
+    # upstream hostname can't resolve at all ("host not found in
+    # upstream"), so this container (and the nginx-vts scrape job below,
+    # and the sli:availability:*/sli:latency:* "official" SLIs that depend
+    # on it) won't come up until that's addressed — see the v1-metrics
+    # README's "Known gap" section. Deferred deliberately, not an oversight.
     build: ../expense-frontend-v1
     container_name: frontend
     ports:

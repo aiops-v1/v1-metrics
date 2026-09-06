@@ -21,10 +21,11 @@ DURATION_SECONDS=300 ./healthy-load.sh
 ## `fault-load.sh`
 Sends genuinely invalid requests — wrong password, duplicate signup, weak
 password, no auth cookie, unknown route, malformed JSON — to put real 4xx
-and 5xx traffic on the error-rate panel. This stage has no
-`ENABLE_DEBUG_ROUTES`/`/debug` API yet, so unlike the reference build's
-Phase 5 injection tooling, nothing here flips a server-side flag; every
-fault is just a bad request a real client could send.
+and 5xx traffic on the error-rate panel. This stage doesn't set
+`ENABLE_DEBUG_ROUTES` (a backend flag that would otherwise expose a
+`/debug` API for flipping internal failure modes on and off), so nothing
+here flips a hidden server-side switch — every fault is just a bad request
+a real client could send.
 
 ```bash
 BASE_URL=http://localhost ITERATIONS=50 ./fault-load.sh
