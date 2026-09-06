@@ -11,14 +11,19 @@ Alertmanager, Grafana), just different questions asked of the same data.
 ## What's running
 
 The app repos (`../expense-backend-v1`, `../expense-frontend-v1`,
-`../expense-mysql-v1` — siblings of this folder) are unmodified; this
-folder only adds the observability layer around them:
+`../expense-mysql-v1` — siblings of this folder) are otherwise unmodified;
+this folder mostly adds the observability layer around them. One exception:
+`../expense-frontend-v1`'s `nginx.conf`/`Dockerfile` have their otel/tracing
+config removed (and `src/main.jsx` no longer imports the browser-side
+tracer) — this stage is metrics-only, with no otel-collector on the
+network for any of that to talk to, and nginx refuses to start outright
+when a static upstream hostname it references can't resolve at all. Ready
+to be re-added whenever a traces stage gets built.
 
 - **Prometheus** — scrapes the backend's own `/metrics`, `mysqld-exporter`
   (a sidecar process reading MySQL's internals), `nginx-exporter` (reading
   nginx's `stub_status`), nginx-module-vts (request-duration histograms,
-  straight from nginx — see the SLO section's "Known gap" for why this one
-  currently has no data), `node-exporter` (host CPU/mem/disk via `/proc`,
+  straight from nginx), `node-exporter` (host CPU/mem/disk via `/proc`,
   `/sys`), and `cadvisor` (per-container CPU/mem)
 - **Alertmanager** — receives firing alerts from Prometheus, routes them to
   email + Slack (`alertmanager/alertmanager.yml`; one-time credential setup
@@ -249,9 +254,7 @@ asked one layer downstream, straight from the backend. Alerting fires on
 the official one; the dashboard plots both, because *the gap between them*
 is diagnostic on its own — if only the official line dips, the problem is
 nginx (or the network between nginx and the backend); if both dip together,
-it's downstream, in the backend or MySQL. See "Known gap" near the end of
-this section, though, before assuming the official layer has real data —
-it currently doesn't, in this stage, for an unrelated reason.
+it's downstream, in the backend or MySQL.
 
 ### SLA vs. SLO — why there are two numbers, not one
 Applied to both signals this stage tracks, same pattern each time: the
@@ -409,26 +412,6 @@ show up on the *other* table, also automatically.
   line crossing 0.4s while `LatencyP99High` shows `firing` in the alert
   table is the equivalent "how it connects" moment for latency.
 
-### Known gap: the frontend currently won't start in this stage
-`../expense-frontend-v1`'s `nginx.conf` references another service by
-hostname that isn't part of this stage's `docker-compose.yml` — reserved
-for a later stage this curriculum hasn't reached yet. nginx resolves a
-static hostname reference like that once, at startup, not per-request; when
-it can't resolve at all (no service by that name exists on this network,
-not just temporarily unreachable), nginx typically refuses to start rather
-than degrading gracefully — so the whole frontend container fails to come
-up, not just the one feature that reference was for.
-
-Practical effect right now: `mysql`, `backend`, and every exporter that
-doesn't depend on the frontend still work fine, including the
-`sli:backend:*` (diagnostic) SLIs and their panels. The `nginx-vts` scrape
-job, the `sli:availability:*`/`sli:latency:*` (official) SLIs, and the two
-SLO burn-rate alerts that read them will show "no data" and never fire
-until the frontend can actually start. Deferred deliberately for now, not
-an oversight — fixing it means either bringing that missing service into
-this stage ahead of schedule, or editing this copy of the frontend's config
-to drop the reference to it. Neither has been done yet.
-
-### What else is still deliberately missing
+### What's still deliberately missing
 No automated response to a firing SLO alert — that's a distinct piece of
 work of its own.
