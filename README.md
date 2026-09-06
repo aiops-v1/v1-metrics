@@ -11,7 +11,7 @@ Alertmanager, Grafana), just different questions asked of the same data.
 ## What's running
 
 The app repos (`../expense-backend-v1.1`, `../expense-frontend-v1.1`,
-`../expense-mysql-v1.1` — siblings of this folder) are otherwise
+`../expense-mysql-v1` — siblings of this folder) are otherwise
 unmodified; this folder mostly adds the observability layer around them.
 One exception: `../expense-backend-v1.1`'s `src/app.js` has its middleware
 order fixed — `httpLogger`/`baseLogContext`/`httpMetricsMiddleware` now run
