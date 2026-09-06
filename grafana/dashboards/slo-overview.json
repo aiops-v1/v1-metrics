@@ -86,8 +86,8 @@
     {
       "id": 3,
       "type": "timeseries",
-      "title": "Availability burn rate — 1h vs 30d windows, vs the 14x alert threshold",
-      "gridPos": { "h": 8, "w": 24, "x": 0, "y": 7 },
+      "title": "Availability burn rate — 1h window, vs the 14x alert threshold",
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 7 },
       "datasource": { "type": "prometheus", "uid": "prometheus" },
       "fieldConfig": {
         "defaults": {
@@ -109,21 +109,44 @@
           "expr": "(1 - sli:availability:ratio_rate1h) / 0.005",
           "legendFormat": "burn rate (1h)",
           "refId": "A"
+        }
+      ]
+    },
+    {
+      "id": 6,
+      "type": "timeseries",
+      "title": "Availability burn rate — 30d window, vs the 14x alert threshold",
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 7 },
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "custom": { "thresholdsStyle": { "mode": "line" } },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              { "color": "green", "value": null },
+              { "color": "red", "value": 14 }
+            ]
+          }
         },
+        "overrides": []
+      },
+      "targets": [
         {
           "datasource": { "type": "prometheus", "uid": "prometheus" },
           "expr": "(1 - sli:availability:ratio_rate30d) / 0.005",
           "legendFormat": "burn rate (30d)",
-          "refId": "B"
+          "refId": "A"
         }
       ]
     },
 
-    { "id": 101, "type": "row", "title": "SLIs — the raw numbers the burn rate and alerts above are computed from", "gridPos": { "h": 1, "w": 24, "x": 0, "y": 15 } },
+    { "id": 101, "type": "row", "title": "Availability SLI — the raw ratio the burn rate above is computed from (SLO target: 99.5%, SLA: 99%)", "gridPos": { "h": 1, "w": 24, "x": 0, "y": 15 } },
     {
       "id": 4,
       "type": "timeseries",
-      "title": "Availability SLI — 1h vs 30d (SLO target: 99.5%, SLA: 99%)",
+      "title": "Availability SLI — 1h window",
       "gridPos": { "h": 8, "w": 12, "x": 0, "y": 16 },
       "datasource": { "type": "prometheus", "uid": "prometheus" },
       "fieldConfig": { "defaults": { "unit": "percentunit", "min": 0.9, "max": 1 }, "overrides": [] },
@@ -133,20 +156,33 @@
           "expr": "sli:availability:ratio_rate1h",
           "legendFormat": "1h",
           "refId": "A"
-        },
-        {
-          "datasource": { "type": "prometheus", "uid": "prometheus" },
-          "expr": "sli:availability:ratio_rate30d",
-          "legendFormat": "30d",
-          "refId": "B"
         }
       ]
     },
     {
+      "id": 7,
+      "type": "timeseries",
+      "title": "Availability SLI — 30d window",
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 16 },
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "fieldConfig": { "defaults": { "unit": "percentunit", "min": 0.9, "max": 1 }, "overrides": [] },
+      "targets": [
+        {
+          "datasource": { "type": "prometheus", "uid": "prometheus" },
+          "expr": "sli:availability:ratio_rate30d",
+          "legendFormat": "30d",
+          "refId": "A"
+        }
+      ]
+    },
+
+    { "id": 102, "type": "row", "title": "Latency SLI — estimated p99, aggregated across every route (SLO target: 200ms)", "gridPos": { "h": 1, "w": 24, "x": 0, "y": 24 } },
+    {
       "id": 5,
       "type": "timeseries",
-      "title": "Latency SLI — estimated p99, 1h vs 30d (SLO target: 200ms)",
-      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 16 },
+      "title": "Latency SLI — 1h window",
+      "description": "One aggregate number across every route — it can tell you THAT p99 is over target, not WHICH endpoint. See the alert's own description for the worst-offending route at fire time, or the metrics dashboard's per-method+route p50/p95/p99 panels to look it up yourself.",
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 25 },
       "datasource": { "type": "prometheus", "uid": "prometheus" },
       "fieldConfig": {
         "defaults": {
@@ -168,12 +204,36 @@
           "expr": "sli:latency:p99_seconds_rate1h",
           "legendFormat": "1h",
           "refId": "A"
+        }
+      ]
+    },
+    {
+      "id": 8,
+      "type": "timeseries",
+      "title": "Latency SLI — 30d window",
+      "description": "One aggregate number across every route — it can tell you THAT p99 is over target, not WHICH endpoint. See the alert's own description for the worst-offending route at fire time, or the metrics dashboard's per-method+route p50/p95/p99 panels to look it up yourself.",
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 25 },
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "s",
+          "custom": { "thresholdsStyle": { "mode": "line" } },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              { "color": "green", "value": null },
+              { "color": "red", "value": 0.2 }
+            ]
+          }
         },
+        "overrides": []
+      },
+      "targets": [
         {
           "datasource": { "type": "prometheus", "uid": "prometheus" },
           "expr": "sli:latency:p99_seconds_rate30d",
           "legendFormat": "30d",
-          "refId": "B"
+          "refId": "A"
         }
       ]
     }

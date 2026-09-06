@@ -362,6 +362,22 @@ estimate is interpolated between the 0.1s and 0.25s buckets, the reported
 "p99" here is an approximation of the true p99, more so than it would be
 with a bucket boundary actually placed near 0.2s.
 
+**One more real limitation, worth naming rather than working around
+silently**: `sli:latency:p99_seconds_rate1h` is a single aggregate number
+across *every* route combined — it can tell you the backend's p99 is over
+200ms, but not *which* endpoint is actually slow. Rather than break the
+SLO itself apart per-route (turning one clear "is the backend fast enough"
+number into several), `LatencyP99High`'s `description` runs a second,
+one-off query at the moment the alert notification is actually rendered —
+Prometheus's `query` template function, not a recording rule — that finds
+the single worst route+method via `topk(1, ...)` and names it directly in
+the Slack/email text: `Slowest endpoint right now: POST /auth/signup (p99
+497ms)`. Confirmed live: bcrypt's cost factor (`BCRYPT_ROUNDS = 12` in
+`expense-backend-v1/src/routes/auth.js`) makes `/auth/signup` and
+`/auth/signin` reliably the slowest routes in this app, by a wide margin
+over anything DB-bound — worth pointing out as the real, first thing this
+alert is likely to ever name, not a hypothetical.
+
 ### Sizing fault injection so it moves the needle without exhausting a month's budget
 The 0.5% error budget is small on purpose — it doesn't take much to
 consume a lot of it, which is exactly why "don't overdo it" is a real
@@ -399,29 +415,39 @@ more `slo`-labeled alerts, they show up here automatically; non-SLO alerts
 show up on the *other* table, also automatically.
 
 ### SLO dashboard panels
+Every 1h/30d pair is two separate panels, not two lines sharing one panel
+and one auto-scaled y-axis — a 1h ratio and a 30d ratio can sit only
+fractions of a percent apart, and squeezed onto the same tight axis
+(sometimes together with the 30d line only stepping once every 5 minutes,
+per `slo-rules.yml`'s two rule-group intervals) the two lines can look like
+they're doing something dramatic — a "jump" — that's really just each
+window's own scale being different. Separate panels, each free to
+auto-scale to its own data, read as flat, boring, correct — which is what
+a healthy SLO should look like.
+
 - **Error budget remaining** — `(sli:availability:ratio_rate30d - 0.995) /
   (1 - 0.995) * 100`. Same "restate as a percentage of budget" idea as
   above, phrased as "how much is left" instead of "how fast is it going."
   100% = no budget spent yet; 0% = exactly on target; negative = already
   over budget.
-- **Burn rate vs. threshold** — plots both
-  `(1 - sli:availability:ratio_rate1h) / 0.005` and the 30d equivalent as
-  two lines, with a reference line at 14 (`fieldConfig.thresholds` with
-  `thresholdsStyle.mode: "line"` — a visual threshold line, not a second
-  query). Watching both lines cross 14 at the same moment the alert table
-  shows `AvailabilitySLOBurnRate` as `firing` is the single best "this is
-  how it all connects" moment in this stage — and watching the 30d line
-  react *more slowly* than the 1h line as the session goes on is the
-  caveat above made visible.
-- **Availability SLI panel** — the raw ratio the burn rate above is
-  computed from, 1h vs. 30d side by side, so a real incident is visible as
-  *both* lines dropping together (early in a session), or just the 1h line
-  dropping alone (later in a session, once 30d has enough history to be
-  less reactive).
-- **Latency SLI panel** — estimated p99, 1h vs. 30d, with a reference line
-  at 0.2s (the SLO target) — a rising line crossing it while
+- **Burn rate vs. threshold** (1h panel, 30d panel) — each plots its own
+  window's `(1 - ratio) / 0.005`, with a reference line at 14
+  (`fieldConfig.thresholds` with `thresholdsStyle.mode: "line"` — a visual
+  threshold line, not a second query). Watching the 1h panel's line cross
+  14 at the same moment the alert table shows `AvailabilitySLOBurnRate` as
+  `firing` is the best "this is how it all connects" moment in this stage
+  — then checking the 30d panel next to it and seeing it react more slowly
+  (or not at all, later in a long session) is the multi-window caveat made
+  visible, without the two panels' different scales fighting each other
+  for one shared axis.
+- **Availability SLI** (1h panel, 30d panel) — the raw ratio the burn rate
+  above is computed from.
+- **Latency SLI** (1h panel, 30d panel) — estimated p99, with a reference
+  line at 0.2s (the SLO target). A rising line crossing it while
   `LatencyP99High` shows `firing` in the alert table is the equivalent
-  "how it connects" moment for latency.
+  "how it connects" moment for latency — and the alert's own description
+  (see above) is where you'd actually find out *which* route is behind it,
+  since this panel's number is the whole-backend aggregate.
 
 ### What's still deliberately missing
 No automated response to a firing SLO alert — that's a distinct piece of

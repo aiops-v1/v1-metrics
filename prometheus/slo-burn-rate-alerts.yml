@@ -66,6 +66,14 @@ groups:
           slo: latency
         annotations:
           summary: 'Latency SLO: p99 above the 200ms target'
+          # sli:latency:p99_seconds_rate1h is a single aggregate number
+          # across every route — on its own it can't say *which* endpoint is
+          # slow. This runs a second, one-off query at alert-fire time
+          # (Prometheus's own `query` template function, evaluated when the
+          # alert notification is rendered, not a recording rule) to name
+          # the actual worst offender instead of leaving the reader to go
+          # find it themselves in Grafana.
           description: >-
             Estimated backend p99 request duration has been above 200ms on
-            both the 1h and 30d windows.
+            both the 1h and 30d windows. Slowest endpoint right now:
+            {{ with query "topk(1, histogram_quantile(0.99, sum(rate(http_request_duration_seconds_bucket[1h])) by (le, method, route)))" }}{{ range . }}{{ .Labels.method }} {{ .Labels.route }} (p99 {{ .Value | humanizeDuration }}){{ end }}{{ else }}unknown — no per-route data available{{ end }}.
