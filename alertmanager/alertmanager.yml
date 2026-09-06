@@ -1,8 +1,8 @@
 global:
   resolve_timeout: 5m
   smtp_smarthost: 'smtp.gmail.com:587'
-  smtp_from: 'REPLACE_WITH_YOUR_GMAIL_ADDRESS'
-  smtp_auth_username: 'REPLACE_WITH_YOUR_GMAIL_ADDRESS'
+  smtp_from: 'info@joindevops.com'
+  smtp_auth_username: 'info@joindevops.com'
   # Real secrets never live in this file — see ./secrets/README.md.
   # Confirmed field names against Prometheus's own Alertmanager
   # configuration reference, not guessed: smtp_auth_password_file and
@@ -21,9 +21,9 @@ route:
 receivers:
   - name: 'email-and-slack'
     email_configs:
-      - to: 'REPLACE_WITH_DESTINATION_EMAIL'
+      - to: 'm.sivakmrreddy@gmail.com'
         send_resolved: true
     slack_configs:
-      - channel: '#alerts'
+      - channel: '#grafana-alerts-2'
         api_url_file: /etc/alertmanager/secrets/slack_webhook_url
         send_resolved: true
