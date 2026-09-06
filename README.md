@@ -246,53 +246,50 @@ Everything above treats "alerting" as a threshold. This section is the
 other kind: alerting on *rate of error-budget consumption*, on the
 `Expense Tracker — v1 SLO & Burn Rate` dashboard.
 
-Every SLI below actually comes in two layers: `sli:availability:*` /
-`sli:latency:*` (no second segment) is the **official** number, measured at
-nginx via nginx-module-vts — the boundary closest to the real client.
-`sli:backend:availability:*` / `sli:backend:latency:*` is the same question
-asked one layer downstream, straight from the backend. Alerting fires on
-the official one; the dashboard plots both, because *the gap between them*
-is diagnostic on its own — if only the official line dips, the problem is
-nginx (or the network between nginx and the backend); if both dip together,
-it's downstream, in the backend or MySQL.
+Backend-only — every SLI below (`sli:availability:*`, `sli:latency:*`)
+comes straight from the backend's own metrics, one source, no second
+layer. nginx-module-vts metrics exist and work (see the metrics
+dashboard's "nginx vs backend latency" panel), but an earlier version of
+this section paired them with the backend's own numbers as an
+"official vs diagnostic" comparison, and that added a second axis of
+complexity — which layer is which, why two numbers for the same idea — that
+wasn't worth it for what an SLO needs to teach here. One number, one
+source, is enough. If a proxy-layer comparison becomes useful later, that's
+a second, separate dashboard once there's a reason to build it, not a
+second set of names bolted onto this one.
 
-### SLA vs. SLO — why there are two numbers, not one
-Applied to both signals this stage tracks, same pattern each time: the
-internal target is deliberately *stricter* than the external commitment,
-so breaching the internal number is the early warning that gives you room
-to fix things before the external one — the one you'd owe a customer over
-— is actually at risk.
-
+### SLA vs. SLO — availability only
 - **Availability** — SLA **99%** (external/contractual) vs. SLO **99.5%**
-  (internal, what this stack actually alerts on). Every availability alert
-  and error-budget calculation below is against the SLO (0.995), never
-  directly against the 99% SLA.
-- **Latency** — client-facing commitment **500ms p99** vs. internal target
-  **400ms p99** (session-only numbers, chosen for this teaching session
-  specifically — not derived from any real measured baseline). Same shape
-  as availability: the alert fires on 400ms, well before the 500ms
-  commitment is actually broken.
+  (internal, what this stack actually alerts on), deliberately *stricter*
+  than the SLA — breaching the SLO is the early warning that gives you room
+  to fix things before the SLA itself, the number you'd owe a customer
+  over, is actually at risk. Every availability alert and error-budget
+  calculation below is against the SLO (0.995), never directly against the
+  99% SLA.
+- **Latency** — a single target, **200ms p99**, no separate SLA number.
+  Simpler on purpose: not every SLO needs the SLA/SLO pair to be useful,
+  and one clear number beats two numbers whose relationship needs
+  explaining.
 - **Window: 30 days.** Both SLOs are measured over a rolling 30-day period
   — the industry-standard accounting window, and long enough that a single
   bad hour is a real, visible dip rather than the entire signal.
 
 ### What's an SLI and an error budget
 - **SLI** (Service Level *Indicator*) — the actual measured number.
-  Availability's is a ratio; latency's, this session, is a percentile
-  value rather than a ratio (more on why below):
+  Availability's is a ratio; latency's is a percentile value rather than a
+  ratio (more on why below):
   ```promql
-  sli:availability:ratio_rate1h            # official (nginx): fraction of requests, last 1h, NOT a 5xx
-  sli:availability:ratio_rate30d           # official (nginx): same, over the full 30-day SLO window
-  sli:backend:availability:ratio_rate1h    # diagnostic (backend): same question, one layer downstream
-  sli:latency:p99_seconds_rate1h           # official (nginx): estimated p99 duration, last 1h, in seconds
-  sli:backend:latency:p99_seconds_rate1h   # diagnostic (backend): same estimate, one layer downstream
+  sli:availability:ratio_rate1h   # fraction of requests, last 1h, that were NOT a 5xx
+  sli:availability:ratio_rate30d  # same fraction, over the full 30-day SLO window
+  sli:latency:p99_seconds_rate1h  # estimated p99 request duration, last 1h, in seconds
+  sli:latency:p99_seconds_rate30d # same estimate, over the full 30-day window
   ```
 - **Error budget** — the SLO restated as "how much failure is allowed":
   target 99.5% availability means the budget is the other 0.5%
   (`1 - 0.995 = 0.005`). This turns "is 99.3% availability bad?" from a
   vague question into an arithmetic one: at 99.3%, you've already spent
   0.7 of your 0.5-point budget — you're *over* budget, not just "a little
-  under 100%." Latency's 400ms p99 target doesn't have an equally clean
+  under 100%." Latency's 200ms p99 target doesn't have an equally clean
   error-budget reading (see below) — it's a threshold, not a budget.
 
 ### The burn-rate alerts, with real numbers
@@ -330,9 +327,9 @@ demo-friendly — the 30d side becomes.
 
 ### The latency alert is a threshold, not burn-rate math — and why
 ```promql
-sli:latency:p99_seconds_rate1h > 0.4
+sli:latency:p99_seconds_rate1h > 0.2
 and
-sli:latency:p99_seconds_rate30d > 0.4
+sli:latency:p99_seconds_rate30d > 0.2
 ```
 Availability has a natural error-budget reading because "% of requests
 that were non-5xx" is already a ratio in [0, 1] — subtracting it from 1
@@ -340,16 +337,16 @@ directly gives "% that were bad," which is exactly what an error budget
 measures. A p99 duration doesn't reduce the same way: `histogram_quantile()`
 estimates *a duration value* (via linear interpolation between whichever
 two bucket boundaries straddle the 99th percentile), not a fraction of
-requests below a fixed line. Getting an exact "% of requests under 400ms"
-would need an actual `le="0.4"` bucket boundary, which doesn't exist here
-(the nearest real boundaries are `le="0.25"` and `le="0.5"`) — so
+requests below a fixed line. Getting an exact "% of requests under 200ms"
+would need an actual `le="0.2"` bucket boundary, which doesn't exist here
+(the nearest real boundaries are `le="0.1"` and `le="0.25"`) — so
 `LatencyP99High` is a direct threshold on the estimated value instead,
 same style as `alert-rules.yml`'s plain thresholds, just still carrying
 the `slo: latency` label so it shows up on this dashboard rather than the
 metrics one. Worth knowing as a limitation, not a bug: because the
-estimate is interpolated between the 0.25s and 0.5s buckets, the reported
+estimate is interpolated between the 0.1s and 0.25s buckets, the reported
 "p99" here is an approximation of the true p99, more so than it would be
-with a bucket boundary actually placed near 0.4s.
+with a bucket boundary actually placed near 0.2s.
 
 ### Sizing fault injection so it moves the needle without exhausting a month's budget
 The 0.5% error budget is small on purpose — it doesn't take much to
@@ -407,10 +404,10 @@ show up on the *other* table, also automatically.
   *both* lines dropping together (early in a session), or just the 1h line
   dropping alone (later in a session, once 30d has enough history to be
   less reactive).
-- **Latency SLI panel** — estimated p99, 1h vs. 30d, with reference lines
-  at 0.4s (internal target) and 0.5s (client-facing commitment) — a rising
-  line crossing 0.4s while `LatencyP99High` shows `firing` in the alert
-  table is the equivalent "how it connects" moment for latency.
+- **Latency SLI panel** — estimated p99, 1h vs. 30d, with a reference line
+  at 0.2s (the SLO target) — a rising line crossing it while
+  `LatencyP99High` shows `firing` in the alert table is the equivalent
+  "how it connects" moment for latency.
 
 ### What's still deliberately missing
 No automated response to a firing SLO alert — that's a distinct piece of

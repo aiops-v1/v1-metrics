@@ -40,13 +40,13 @@ scrape_configs:
 
   # nginx-module-vts, scraped straight from nginx itself — adds
   # request-duration histograms and per-status-code counts, which
-  # stub_status (the job above) has no concept of at all. This is what
-  # makes an nginx-level ("official") SLI possible in slo-rules.yml,
-  # compared there against the backend-level ("diagnostic") one. Confirmed
-  # against the module's own source, not guessed: the path is
-  # /status/format/prometheus, and it emits a host="*" all-vhosts-combined
-  # pseudo-series alongside the real per-vhost one — every query against
-  # this job in slo-rules.yml filters host!="*" for exactly that reason.
+  # stub_status (the job above) has no concept of at all. Used by the
+  # metrics dashboard's "nginx vs backend latency" panel only — the SLO
+  # layer (slo-rules.yml) is backend-only. Confirmed against the module's
+  # own source, not guessed: the path is /status/format/prometheus, and it
+  # emits a host="*" all-vhosts-combined pseudo-series alongside the real
+  # per-vhost one — every query against this job filters host!="*" for
+  # exactly that reason.
   - job_name: 'nginx-vts'
     static_configs:
       - targets: ['frontend:8080']

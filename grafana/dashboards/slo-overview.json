@@ -13,7 +13,7 @@
     {
       "id": 1,
       "type": "stat",
-      "title": "Availability error budget remaining (official, nginx — 30d window, 99.5% SLO / 99% SLA)",
+      "title": "Availability error budget remaining (30d window, 99.5% SLO / 99% SLA)",
       "gridPos": { "h": 6, "w": 8, "x": 0, "y": 1 },
       "datasource": { "type": "prometheus", "uid": "prometheus" },
       "fieldConfig": {
@@ -86,7 +86,7 @@
     {
       "id": 3,
       "type": "timeseries",
-      "title": "Availability burn rate (official, nginx) — 1h vs 30d windows, vs the 14x alert threshold",
+      "title": "Availability burn rate — 1h vs 30d windows, vs the 14x alert threshold",
       "gridPos": { "h": 8, "w": 24, "x": 0, "y": 7 },
       "datasource": { "type": "prometheus", "uid": "prometheus" },
       "fieldConfig": {
@@ -119,11 +119,11 @@
       ]
     },
 
-    { "id": 101, "type": "row", "title": "SLIs — official (nginx) vs diagnostic (backend): a gap here says where the problem lives", "gridPos": { "h": 1, "w": 24, "x": 0, "y": 15 } },
+    { "id": 101, "type": "row", "title": "SLIs — the raw numbers the burn rate and alerts above are computed from", "gridPos": { "h": 1, "w": 24, "x": 0, "y": 15 } },
     {
       "id": 4,
       "type": "timeseries",
-      "title": "Availability SLI — official (nginx) vs diagnostic (backend), 1h & 30d (SLO target: 99.5%, SLA: 99%)",
+      "title": "Availability SLI — 1h vs 30d (SLO target: 99.5%, SLA: 99%)",
       "gridPos": { "h": 8, "w": 12, "x": 0, "y": 16 },
       "datasource": { "type": "prometheus", "uid": "prometheus" },
       "fieldConfig": { "defaults": { "unit": "percentunit", "min": 0.9, "max": 1 }, "overrides": [] },
@@ -131,33 +131,21 @@
         {
           "datasource": { "type": "prometheus", "uid": "prometheus" },
           "expr": "sli:availability:ratio_rate1h",
-          "legendFormat": "official (nginx), 1h",
+          "legendFormat": "1h",
           "refId": "A"
         },
         {
           "datasource": { "type": "prometheus", "uid": "prometheus" },
           "expr": "sli:availability:ratio_rate30d",
-          "legendFormat": "official (nginx), 30d",
+          "legendFormat": "30d",
           "refId": "B"
-        },
-        {
-          "datasource": { "type": "prometheus", "uid": "prometheus" },
-          "expr": "sli:backend:availability:ratio_rate1h",
-          "legendFormat": "diagnostic (backend), 1h",
-          "refId": "C"
-        },
-        {
-          "datasource": { "type": "prometheus", "uid": "prometheus" },
-          "expr": "sli:backend:availability:ratio_rate30d",
-          "legendFormat": "diagnostic (backend), 30d",
-          "refId": "D"
         }
       ]
     },
     {
       "id": 5,
       "type": "timeseries",
-      "title": "Latency SLI — official (nginx) vs diagnostic (backend) p99, 1h & 30d (internal target: 400ms, client commitment: 500ms)",
+      "title": "Latency SLI — estimated p99, 1h vs 30d (SLO target: 200ms)",
       "gridPos": { "h": 8, "w": 12, "x": 12, "y": 16 },
       "datasource": { "type": "prometheus", "uid": "prometheus" },
       "fieldConfig": {
@@ -168,8 +156,7 @@
             "mode": "absolute",
             "steps": [
               { "color": "green", "value": null },
-              { "color": "yellow", "value": 0.4 },
-              { "color": "red", "value": 0.5 }
+              { "color": "red", "value": 0.2 }
             ]
           }
         },
@@ -179,26 +166,14 @@
         {
           "datasource": { "type": "prometheus", "uid": "prometheus" },
           "expr": "sli:latency:p99_seconds_rate1h",
-          "legendFormat": "official (nginx), 1h",
+          "legendFormat": "1h",
           "refId": "A"
         },
         {
           "datasource": { "type": "prometheus", "uid": "prometheus" },
           "expr": "sli:latency:p99_seconds_rate30d",
-          "legendFormat": "official (nginx), 30d",
+          "legendFormat": "30d",
           "refId": "B"
-        },
-        {
-          "datasource": { "type": "prometheus", "uid": "prometheus" },
-          "expr": "sli:backend:latency:p99_seconds_rate1h",
-          "legendFormat": "diagnostic (backend), 1h",
-          "refId": "C"
-        },
-        {
-          "datasource": { "type": "prometheus", "uid": "prometheus" },
-          "expr": "sli:backend:latency:p99_seconds_rate30d",
-          "legendFormat": "diagnostic (backend), 30d",
-          "refId": "D"
         }
       ]
     }

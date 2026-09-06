@@ -41,20 +41,25 @@ simulate_one_user() {
     "$API/auth/signup"
   sleep "$SLEEP_SECONDS"
 
-  local categories category_id
+  local categories
   categories=$(curl -fsS -c "$jar" -b "$jar" "$API/categories")
-  category_id=$(echo "$categories" | grep -o '"id":[0-9]*' | head -1 | grep -o '[0-9]*$')
-  if [ -z "$category_id" ]; then
+  local -a category_ids
+  category_ids=($(echo "$categories" | grep -o '"id":[0-9]*' | grep -o '[0-9]*$'))
+  if [ "${#category_ids[@]}" -eq 0 ]; then
     echo "[healthy] ${email} — no categories returned, skipping expenses" >&2
     rm -f "$jar"
     return
   fi
 
   for _ in $(seq 1 "$EXPENSES_PER_USER"); do
-    local amount days_ago expense_date
+    local amount days_ago expense_date category_id
     amount=$(( (RANDOM % 5000) + 50 ))
     days_ago=$((RANDOM % 90))
     expense_date=$(date -d "-${days_ago} days" +%F 2>/dev/null || date -v-"${days_ago}"d +%F)
+    # Random category per expense, not the same one every time — deliberately
+    # spreads real activity across categories so the "by category" dashboard
+    # panels (a bar per category) have more than one bar to show.
+    category_id="${category_ids[$((RANDOM % ${#category_ids[@]}))]}"
 
     echo "[healthy] ${email} — create expense: amount=${amount} categoryId=${category_id} date=${expense_date}"
     curl -fsS -o /dev/null -c "$jar" -b "$jar" -X POST -H 'Content-Type: application/json' \
