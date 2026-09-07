@@ -97,7 +97,6 @@ services:
       - /dev/kmsg
     volumes:
       - /:/rootfs:ro
-      - /var/run:/var/run:ro
       - /sys:/sys:ro
       - /var/lib/docker/:/var/lib/docker:ro
       - /dev/disk/:/dev/disk:ro
@@ -115,6 +114,21 @@ services:
       # containerd's API rather than parsing Docker's internal files, which
       # sidesteps the broken path entirely.
       - /run/containerd/containerd.sock:/run/containerd/containerd.sock:ro
+      # Deliberately NOT mounting /var/run:/var/run:ro here (a common cAdvisor
+      # example mount, and present in an earlier version of this file).
+      # /var/run/docker.sock lives under it, and on a host where that socket
+      # is reachable, cAdvisor's Docker factory registers itself alongside the
+      # containerd one above and immediately hits the exact same
+      # "failed to identify the read-write layer ID" error for every real
+      # container — this backend breaks the Docker factory outright regardless
+      # of which other factory is also configured. Confirmed live: on one
+      # deploy of this stack the Docker factory silently found no socket and
+      # never registered (clean logs); on a second, fresh EC2 host it did find
+      # one and produced this exact duplicate failure per container. Cutting
+      # off socket access is what actually makes Docker-factory registration
+      # fail cleanly and deterministically (logged once, non-fatal) instead of
+      # depending on host-specific luck, leaving the containerd factory below
+      # as the only one in play.
     command:
       - --containerd=/run/containerd/containerd.sock
       # Docker's own embedded containerd instance namespaces everything it
